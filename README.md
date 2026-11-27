@@ -71,16 +71,18 @@ Original application code, CSS, SVG château, icon, and authored content: **MIT*
 
 Direct development dependencies (all free, never called as paid runtime services):
 
-| Package | License | Purpose |
-| --- | --- | --- |
-| TypeScript | Apache-2.0 | Type checking |
-| Vite | MIT | Development/build |
-| Vitest | MIT | Unit tests |
-| vite-plugin-pwa | MIT | Manifest/service worker |
-| @playwright/test | Apache-2.0 | Browser verification |
+| Package          | License    | Purpose                 |
+| ---------------- | ---------- | ----------------------- |
+| TypeScript       | Apache-2.0 | Type checking           |
+| Vite             | MIT        | Development/build       |
+| Vitest           | MIT        | Unit tests              |
+| vite-plugin-pwa  | MIT        | Manifest/service worker |
+| @playwright/test | Apache-2.0 | Browser verification    |
 
 Workbox (service-worker tooling/runtime) is MIT. The complete resolved dependency/license inventory is generated in `THIRD_PARTY_LICENSES.md`; package license texts remain in each installed dependency. Chromium used for development has BSD-style and third-party licenses and is not distributed by this site. Browser-native IndexedDB, Storage and Speech APIs need no paid service. Hosting uses the public-repository GitHub Pages/Actions free allowance.
 
 ## Next milestones
 
 Constrained procedural floor layouts with guaranteed solvable clues; broader SRS-driven encounter selection; a reviewed 150-word and 20-dialogue A1–A2 pack; content unlocks beyond the first title; and real iOS/Android installation and voice checks. This first slice deliberately starts with a small, playable encounter set.
+
+Source was formatted with Prettier 3.6.2 (MIT, free), used as a one-off development tool without a runtime dependency.

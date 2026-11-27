@@ -1,20 +1,153 @@
 [
- {"id":"porte","lemma":"porte","english":"door","tier":"A1","partOfSpeech":"noun","gender":"f","needs_review":false},
- {"id":"droite","lemma":"à droite","english":"on the right","tier":"A1","partOfSpeech":"phrase","needs_review":false},
- {"id":"gauche","lemma":"à gauche","english":"on the left","tier":"A1","partOfSpeech":"phrase","needs_review":false},
- {"id":"cle","lemma":"clé","english":"key","tier":"A1","partOfSpeech":"noun","gender":"f","needs_review":false},
- {"id":"bleue","lemma":"bleue","english":"blue (feminine)","tier":"A1","partOfSpeech":"adjective","needs_review":false},
- {"id":"verte","lemma":"verte","english":"green (feminine)","tier":"A1","partOfSpeech":"adjective","needs_review":false},
- {"id":"boire","lemma":"boire","english":"to drink","tier":"A1","partOfSpeech":"verb","needs_review":false},
- {"id":"soigner","lemma":"soigner","english":"to heal","tier":"A2","partOfSpeech":"verb","needs_review":false},
- {"id":"poison","lemma":"poison","english":"poison","tier":"A2","partOfSpeech":"noun","gender":"m","needs_review":false},
- {"id":"sortie","lemma":"sortie","english":"exit","tier":"A1","partOfSpeech":"noun","gender":"f","needs_review":false},
- {"id":"ouvrir","lemma":"ouvrir","english":"to open","tier":"A1","partOfSpeech":"verb","needs_review":false},
- {"id":"ecouter","lemma":"écouter","english":"to listen","tier":"A1","partOfSpeech":"verb","needs_review":false},
- {"id":"gardien","lemma":"gardien","english":"guardian","tier":"A2","partOfSpeech":"noun","gender":"m","needs_review":false},
- {"id":"lueur","lemma":"lueur","english":"glimmer","tier":"A2","partOfSpeech":"noun","gender":"f","needs_review":false},
- {"id":"derriere","lemma":"derrière","english":"behind","tier":"A1","partOfSpeech":"preposition","needs_review":false},
- {"id":"aider","lemma":"aider","english":"to help","tier":"A1","partOfSpeech":"verb","needs_review":false},
- {"id":"merci","lemma":"merci","english":"thank you","tier":"A1","partOfSpeech":"phrase","needs_review":false},
- {"id":"danger","lemma":"danger","english":"danger","tier":"A1","partOfSpeech":"noun","gender":"m","needs_review":false}
+  {
+    "id": "porte",
+    "lemma": "porte",
+    "english": "door",
+    "tier": "A1",
+    "partOfSpeech": "noun",
+    "gender": "f",
+    "needs_review": false
+  },
+  {
+    "id": "droite",
+    "lemma": "à droite",
+    "english": "on the right",
+    "tier": "A1",
+    "partOfSpeech": "phrase",
+    "needs_review": false
+  },
+  {
+    "id": "gauche",
+    "lemma": "à gauche",
+    "english": "on the left",
+    "tier": "A1",
+    "partOfSpeech": "phrase",
+    "needs_review": false
+  },
+  {
+    "id": "cle",
+    "lemma": "clé",
+    "english": "key",
+    "tier": "A1",
+    "partOfSpeech": "noun",
+    "gender": "f",
+    "needs_review": false
+  },
+  {
+    "id": "bleue",
+    "lemma": "bleue",
+    "english": "blue (feminine)",
+    "tier": "A1",
+    "partOfSpeech": "adjective",
+    "needs_review": false
+  },
+  {
+    "id": "verte",
+    "lemma": "verte",
+    "english": "green (feminine)",
+    "tier": "A1",
+    "partOfSpeech": "adjective",
+    "needs_review": false
+  },
+  {
+    "id": "boire",
+    "lemma": "boire",
+    "english": "to drink",
+    "tier": "A1",
+    "partOfSpeech": "verb",
+    "needs_review": false
+  },
+  {
+    "id": "soigner",
+    "lemma": "soigner",
+    "english": "to heal",
+    "tier": "A2",
+    "partOfSpeech": "verb",
+    "needs_review": false
+  },
+  {
+    "id": "poison",
+    "lemma": "poison",
+    "english": "poison",
+    "tier": "A2",
+    "partOfSpeech": "noun",
+    "gender": "m",
+    "needs_review": false
+  },
+  {
+    "id": "sortie",
+    "lemma": "sortie",
+    "english": "exit",
+    "tier": "A1",
+    "partOfSpeech": "noun",
+    "gender": "f",
+    "needs_review": false
+  },
+  {
+    "id": "ouvrir",
+    "lemma": "ouvrir",
+    "english": "to open",
+    "tier": "A1",
+    "partOfSpeech": "verb",
+    "needs_review": false
+  },
+  {
+    "id": "ecouter",
+    "lemma": "écouter",
+    "english": "to listen",
+    "tier": "A1",
+    "partOfSpeech": "verb",
+    "needs_review": false
+  },
+  {
+    "id": "gardien",
+    "lemma": "gardien",
+    "english": "guardian",
+    "tier": "A2",
+    "partOfSpeech": "noun",
+    "gender": "m",
+    "needs_review": false
+  },
+  {
+    "id": "lueur",
+    "lemma": "lueur",
+    "english": "glimmer",
+    "tier": "A2",
+    "partOfSpeech": "noun",
+    "gender": "f",
+    "needs_review": false
+  },
+  {
+    "id": "derriere",
+    "lemma": "derrière",
+    "english": "behind",
+    "tier": "A1",
+    "partOfSpeech": "preposition",
+    "needs_review": false
+  },
+  {
+    "id": "aider",
+    "lemma": "aider",
+    "english": "to help",
+    "tier": "A1",
+    "partOfSpeech": "verb",
+    "needs_review": false
+  },
+  {
+    "id": "merci",
+    "lemma": "merci",
+    "english": "thank you",
+    "tier": "A1",
+    "partOfSpeech": "phrase",
+    "needs_review": false
+  },
+  {
+    "id": "danger",
+    "lemma": "danger",
+    "english": "danger",
+    "tier": "A1",
+    "partOfSpeech": "noun",
+    "gender": "m",
+    "needs_review": false
+  }
 ]
