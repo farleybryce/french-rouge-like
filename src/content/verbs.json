@@ -1,0 +1,12 @@
+[
+ {"id":"etre","infinitive":"être","english":"to be","tier":"A1","forms":["suis","es","est","sommes","êtes","sont"]},
+ {"id":"avoir","infinitive":"avoir","english":"to have","tier":"A1","forms":["ai","as","a","avons","avez","ont"]},
+ {"id":"aller","infinitive":"aller","english":"to go","tier":"A1","forms":["vais","vas","va","allons","allez","vont"]},
+ {"id":"faire","infinitive":"faire","english":"to do / make","tier":"A1","forms":["fais","fais","fait","faisons","faites","font"]},
+ {"id":"pouvoir","infinitive":"pouvoir","english":"can / to be able to","tier":"A2","forms":["peux","peux","peut","pouvons","pouvez","peuvent"]},
+ {"id":"vouloir","infinitive":"vouloir","english":"to want","tier":"A2","forms":["veux","veux","veut","voulons","voulez","veulent"]},
+ {"id":"parler","infinitive":"parler","english":"to speak","tier":"A1","regular":"er"},
+ {"id":"chercher","infinitive":"chercher","english":"to look for","tier":"A1","regular":"er"},
+ {"id":"ouvrir","infinitive":"ouvrir","english":"to open","tier":"A2","forms":["ouvre","ouvres","ouvre","ouvrons","ouvrez","ouvrent"]},
+ {"id":"finir","infinitive":"finir","english":"to finish","tier":"A2","regular":"ir"}
+]

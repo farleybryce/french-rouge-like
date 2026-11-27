@@ -1,0 +1,5 @@
+[
+ {"id":"present-faire","verbId":"faire","tier":"A1","tense":"present","explanation":"Avec « vous », on dit « vous faites », sans -s après le t.","english":"With vous, use faites.","needs_review":false},
+ {"id":"present-etre","verbId":"etre","tier":"A1","tense":"present","explanation":"Être change selon le sujet : je suis, nous sommes, vous êtes.","english":"Être is irregular: je suis, nous sommes, vous êtes.","needs_review":false},
+ {"id":"present-avoir","verbId":"avoir","tier":"A1","tense":"present","explanation":"Devant « ai », « je » devient « j’ » : j’ai.","english":"Je becomes j’ before ai: j’ai.","needs_review":false}
+]
