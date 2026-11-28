@@ -84,3 +84,29 @@ export function dueFirst(learner: Learner, ids: string[], now = Date.now()) {
       (learner.items[a]?.dueAt ?? now) - (learner.items[b]?.dueAt ?? now),
   );
 }
+
+// A run snapshots this value. Dungeon stats never depend on language performance.
+export function supportFor(learner: Learner, id: string): 0 | 1 | 2 {
+  const item = learner.items[id];
+  if (!item) return 0;
+  const recent = learner.recent
+    .filter((e) => e.id === id && e.kind !== "seen")
+    .slice(-12);
+  const success = recent.filter(
+    (e) => e.kind === "understood" || e.kind === "produced",
+  ).length;
+  const accuracy = recent.length ? success / recent.length : 0;
+  if (
+    item.producedCorrectly + item.understood >= 6 &&
+    item.repetitions >= 2 &&
+    accuracy >= 0.8
+  )
+    return 2;
+  if (
+    item.producedCorrectly + item.understood >= 3 &&
+    item.repetitions >= 1 &&
+    accuracy >= 0.65
+  )
+    return 1;
+  return 0;
+}

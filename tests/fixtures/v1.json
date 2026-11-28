@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "settings": {
+    "muted": true,
+    "captions": false
+  },
+  "learner": {
+    "items": {
+      "porte": {
+        "seen": 3,
+        "understood": 2,
+        "producedCorrectly": 0,
+        "failed": 0,
+        "hintsUsed": 0,
+        "repetitions": 1,
+        "intervalDays": 1,
+        "dueAt": 86400000
+      }
+    },
+    "recent": [
+      {
+        "id": "porte",
+        "kind": "understood",
+        "at": 0
+      }
+    ],
+    "tier": "A1"
+  },
+  "history": [],
+  "run": {
+    "seed": 1,
+    "x": 3,
+    "y": 5,
+    "hp": 7,
+    "light": 4,
+    "floor": 1,
+    "turns": 0,
+    "enemyHp": 6,
+    "enemyTurn": 0,
+    "npcDone": false,
+    "key": false,
+    "potionTaken": false,
+    "potionSide": "left",
+    "doorSide": "left",
+    "doorRevealed": false,
+    "heard": false,
+    "doorAssisted": false,
+    "status": "playing",
+    "log": "Une voix…",
+    "events": [],
+    "startedAt": 10
+  }
+}

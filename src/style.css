@@ -1006,3 +1006,341 @@ blockquote {
     scroll-behavior: auto !important;
   }
 }
+
+/* Expedition II: tactical resources and optional language support. */
+#app[aria-busy="true"] {
+  pointer-events: none;
+}
+.translation {
+  display: block;
+  font: 12px/1.6 var(--sans);
+  letter-spacing: 0;
+  color: #adc2ba;
+  margin-top: 6px;
+  font-weight: 400;
+  font-style: normal;
+  text-transform: none;
+}
+.expedition-intro {
+  max-width: 740px;
+}
+.expedition-intro .castle-frame {
+  max-width: 310px;
+  margin-bottom: 0;
+}
+.expedition-intro .castle {
+  max-height: 155px;
+}
+.expedition-intro h1 {
+  font-size: 55px;
+}
+.kit-selection {
+  margin: 25px auto;
+  max-width: 520px;
+  text-align: left;
+  display: grid;
+  gap: 10px;
+}
+.kit-selection > .eyebrow {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.kit {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  text-align: left;
+  background: #1c3030;
+}
+.kit.chosen {
+  border-color: var(--gold);
+  background: #a28a441a;
+}
+.kit b {
+  font-size: 19px;
+  font-weight: 400;
+}
+.kit-description {
+  font-size: 13px;
+  display: block;
+  margin-top: 8px;
+  color: #becabc;
+}
+.kit-symbol {
+  font-size: 32px;
+  color: var(--gold);
+  min-width: 34px;
+  text-align: center;
+}
+.kit-check {
+  color: var(--gold);
+  margin-left: auto;
+}
+.kit .translation {
+  font-size: 11px;
+}
+.rules-note {
+  font: 12px/1.7 var(--sans);
+}
+.statusbar {
+  font-size: 15px;
+}
+.statusbar .mana {
+  color: #a9c1e1;
+}
+.statusbar .health {
+  color: #dfb3a0;
+}
+.statusbar .gold {
+  color: var(--gold);
+}
+.statusbar .tier {
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.mapbar {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  font: 11px/1.7 var(--sans);
+  color: var(--muted);
+}
+.cell.cleared:not(.player) {
+  color: #83977a;
+}
+.cell.boss,
+.cell.gate {
+  color: #e6bd7b;
+}
+.cell.treasure,
+.cell.shrine {
+  color: #e0cc8d;
+}
+.cell.camp {
+  color: #9dbaa2;
+}
+.map-legend {
+  flex-wrap: wrap;
+  line-height: 1.7;
+}
+.route-key {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 24px 0;
+}
+.route-key > span {
+  font-size: 20px;
+  color: var(--gold);
+}
+.route-key b {
+  font-size: 15px;
+  font-weight: 400;
+  color: #e4dfc8;
+}
+.route-key .translation {
+  font-size: 10px;
+}
+.inventory {
+  margin-top: 25px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.bag-button {
+  border: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 12px var(--sans);
+  padding: 7px 0;
+  color: #b9c9b6;
+}
+.bag-button > span {
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+.supply-grid {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.supply-grid .choice {
+  font-size: 14px;
+}
+.supply-grid .translation {
+  font-size: 11px;
+}
+.relic-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.relic-badge {
+  font-size: 12px;
+  border-color: #5b6856;
+  padding: 5px 8px;
+  color: #c7c9a1;
+}
+.spell b {
+  font-size: 18px;
+}
+.spell b > i {
+  font: 11px var(--sans);
+  color: #a6bfda;
+  float: right;
+  padding-top: 6px;
+}
+.spell .translation {
+  font-size: 10px;
+  color: #adc0b9;
+}
+.spell > span:last-child {
+  margin-left: 0;
+  flex: 1;
+}
+.intent .translation {
+  font-size: 11px;
+}
+.teaching {
+  border-left: 2px solid #8fbea6;
+  background: #8fbea611;
+  padding: 14px 16px;
+  margin: 18px 0;
+  font-size: 15px;
+}
+.teaching p {
+  font-size: 13px;
+  margin: 8px 0;
+}
+.teaching > small {
+  display: block;
+  font-size: 10px;
+  margin-top: 12px;
+}
+.verb-label {
+  color: var(--gold);
+  font-size: 18px;
+  font-style: italic;
+  margin-left: 10px;
+}
+.retreat {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 9px;
+}
+.retreat .translation {
+  font-size: 10px;
+  margin: 0;
+  text-align: center;
+}
+.reward-title {
+  font-size: 21px;
+  color: var(--gold);
+  display: block;
+  margin-bottom: 8px;
+}
+.reward-description {
+  font-size: 14px;
+  display: block;
+  margin-top: 12px;
+}
+.reward .translation {
+  font-size: 11px;
+}
+.run-stats {
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  color: var(--gold);
+  margin-top: 25px;
+}
+.run-stats .translation {
+  font-size: 10px;
+}
+.migration-note {
+  border: 1px solid #827452;
+  padding: 18px;
+  margin: 20px 0;
+  color: #e7cd97;
+}
+.migration-note p {
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .expedition-intro {
+    padding-top: 30px;
+  }
+  .expedition-intro h1 {
+    font-size: 43px;
+  }
+  .expedition-intro > .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.5px;
+  }
+  .kit {
+    padding: 14px 12px;
+    gap: 12px;
+  }
+  .kit b {
+    font-size: 18px;
+  }
+  .kit-symbol {
+    min-width: 25px;
+    font-size: 25px;
+  }
+  .kit-description {
+    font-size: 12px;
+  }
+  .kit-selection > .eyebrow {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .statusbar {
+    gap: 28px;
+  }
+  .in-combat .chapter-heading {
+    margin-bottom: 14px;
+  }
+  .in-combat .chapter-heading h1 {
+    font-size: 25px;
+  }
+  .in-combat .support-note {
+    display: none;
+  }
+  .in-combat .game-layout {
+    gap: 12px;
+  }
+  .encounter-heading .portrait {
+    width: 45px;
+    min-width: 45px;
+    height: 55px;
+    font-size: 32px;
+  }
+  .encounter-heading {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .encounter-heading h2 {
+    font-size: 22px;
+  }
+  .encounter-heading .translation {
+    font-size: 10px;
+  }
+  .run-stats {
+    gap: 18px;
+    font-size: 14px;
+  }
+  .translation {
+    font-size: 11px;
+  }
+  .expedition-intro .castle-frame {
+    max-width: 230px;
+  }
+}

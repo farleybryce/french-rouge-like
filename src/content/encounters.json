@@ -4,15 +4,37 @@
     "greeting": "Encore un voyageur… Les murs vous écoutent.",
     "clue": "La potion bleue soigne. La verte est un poison. Prenez la bleue.",
     "tokens": [
-      { "text": "La potion " },
-      { "text": "bleue", "vocab": "bleue" },
-      { "text": " " },
-      { "text": "soigne", "vocab": "soigner" },
-      { "text": ". La " },
-      { "text": "verte", "vocab": "verte" },
-      { "text": " est un " },
-      { "text": "poison", "vocab": "poison" },
-      { "text": ". Prenez la bleue." }
+      {
+        "text": "La potion "
+      },
+      {
+        "text": "bleue",
+        "vocab": "bleue"
+      },
+      {
+        "text": " "
+      },
+      {
+        "text": "soigne",
+        "vocab": "soigner"
+      },
+      {
+        "text": ". La "
+      },
+      {
+        "text": "verte",
+        "vocab": "verte"
+      },
+      {
+        "text": " est un "
+      },
+      {
+        "text": "poison",
+        "vocab": "poison"
+      },
+      {
+        "text": ". Prenez la bleue."
+      }
     ],
     "question": "Que cherchez-vous ?",
     "replies": [
@@ -51,24 +73,55 @@
       "name": "Éclat",
       "verbId": "faire",
       "grammarId": "present-faire",
-      "description": "Inflige 2 dégâts. Le gardien riposte.",
-      "flavor": "Faites jaillir la lumière."
+      "description": "3 dégâts. Sans mana.",
+      "english": "3 damage. No mana cost.",
+      "flavor": "Faites jaillir la lumière.",
+      "cost": 0,
+      "symbol": "✧"
     },
     {
       "id": "shield",
       "name": "Miroir",
       "verbId": "etre",
       "grammarId": "present-etre",
-      "description": "Bloque l’attaque et renvoie 1 dégât.",
-      "flavor": "Soyez un miroir face à l’ombre."
+      "description": "Bloque la riposte et renvoie 2 dégâts.",
+      "english": "Block this attack and reflect 2 damage.",
+      "flavor": "Soyez un miroir face à l’ombre.",
+      "cost": 1,
+      "symbol": "◈"
     },
     {
       "id": "heal",
       "name": "Souffle",
       "verbId": "avoir",
       "grammarId": "present-avoir",
-      "description": "Rend 3 points de vie, puis le gardien riposte.",
-      "flavor": "Ayez du courage."
+      "description": "Rend 6 points de vie. La riposte suit.",
+      "english": "Restore 6 health, then take the enemy attack.",
+      "flavor": "Ayez du courage.",
+      "cost": 2,
+      "symbol": "❧"
+    },
+    {
+      "id": "frost",
+      "name": "Pas de givre",
+      "verbId": "aller",
+      "grammarId": "present-aller",
+      "description": "2 dégâts. Gèle l’ennemi pour deux ripostes.",
+      "english": "2 damage. Freeze the enemy for this turn and the next.",
+      "flavor": "Allez là où le froid vous protège.",
+      "cost": 2,
+      "symbol": "❄"
+    },
+    {
+      "id": "drain",
+      "name": "Désir de sang",
+      "verbId": "vouloir",
+      "grammarId": "present-vouloir",
+      "description": "4 dégâts. Rend 3 points de vie. La riposte suit.",
+      "english": "Deal 4 damage and restore 3 health, then take the enemy attack.",
+      "flavor": "Voulez-vous reprendre votre force ?",
+      "cost": 2,
+      "symbol": "♢"
     }
   ]
 }

@@ -1,0 +1,188 @@
+{
+  "floors": [
+    { "name": "Les galeries oubliées", "english": "The forgotten galleries" },
+    { "name": "La crypte des miroirs", "english": "The mirror crypt" },
+    { "name": "Le cœur des Échos", "english": "The heart of the Echoes" }
+  ],
+  "kits": [
+    {
+      "id": "frost",
+      "name": "L’Arpenteur du givre",
+      "english": "Frostwalker",
+      "description": "Gelez l’ennemi, puis frappez sans riposte.",
+      "help": "Start with Pas de givre. Freeze foes to create safe attack turns.",
+      "symbol": "❄"
+    },
+    {
+      "id": "mirror",
+      "name": "Le Gardien des miroirs",
+      "english": "Mirror keeper",
+      "description": "Renvoyez les attaques. Chaque point de mana compte.",
+      "help": "Start with the Mirror shard: your shield reflects 4 damage instead of 2.",
+      "symbol": "◈"
+    },
+    {
+      "id": "blood",
+      "name": "Le Porteur du rubis",
+      "english": "Ruby bearer",
+      "description": "Reprenez vos forces en attaquant.",
+      "help": "Start with Désir de sang. Trade mana for damage and healing.",
+      "symbol": "♢"
+    }
+  ],
+  "relics": [
+    {
+      "id": "ember",
+      "name": "Braise captive",
+      "english": "Captive ember",
+      "description": "Éclat inflige 1 dégât supplémentaire.",
+      "help": "Your free Éclat spell deals +1 damage.",
+      "symbol": "✧"
+    },
+    {
+      "id": "mirror",
+      "name": "Éclat de miroir",
+      "english": "Mirror shard",
+      "description": "Miroir renvoie 2 dégâts supplémentaires.",
+      "help": "Miroir reflects +2 damage. It still costs 1 mana.",
+      "symbol": "◈"
+    },
+    {
+      "id": "flask",
+      "name": "Fiole d’ambre",
+      "english": "Amber flask",
+      "description": "Les potions rendent 3 points de vie supplémentaires.",
+      "help": "Health potions restore 9 health instead of 6.",
+      "symbol": "♜"
+    },
+    {
+      "id": "reservoir",
+      "name": "Réservoir lunaire",
+      "english": "Moon reservoir",
+      "description": "Mana maximal +2. Chaque victoire rend 1 mana supplémentaire.",
+      "help": "Gain 2 maximum and current mana. Victories restore 2 mana instead of 1.",
+      "symbol": "☾"
+    },
+    {
+      "id": "frost",
+      "name": "Sceau du givre",
+      "english": "Frost seal",
+      "description": "Débloque le sort Pas de givre.",
+      "help": "Unlock the spell that freezes foes for two turns.",
+      "symbol": "❄"
+    },
+    {
+      "id": "blood",
+      "name": "Rubis vivant",
+      "english": "Living ruby",
+      "description": "Débloque le sort Désir de sang.",
+      "help": "Unlock the spell that deals damage while healing you.",
+      "symbol": "♢"
+    }
+  ],
+  "enemies": [
+    {
+      "id": "sentry",
+      "name": "Sentinelle de pierre",
+      "english": "Stone sentry",
+      "symbol": "♟",
+      "hp": 5,
+      "hpPerFloor": 2,
+      "attacks": [2, 4],
+      "intents": ["Elle lève sa lance.", "Elle prépare une charge."],
+      "intentEnglish": ["It raises its spear.", "It prepares a charge."]
+    },
+    {
+      "id": "wraith",
+      "name": "Ombre affamée",
+      "english": "Hungry wraith",
+      "symbol": "♙",
+      "hp": 4,
+      "hpPerFloor": 2,
+      "attacks": [3, 1, 4],
+      "intents": [
+        "Elle bondit vers vous.",
+        "Elle reprend son souffle.",
+        "Elle rassemble les ombres."
+      ],
+      "intentEnglish": [
+        "It lunges toward you.",
+        "It catches its breath.",
+        "It gathers the shadows."
+      ]
+    },
+    {
+      "id": "warden",
+      "name": "Gardien du seuil",
+      "english": "Threshold warden",
+      "symbol": "♜",
+      "hp": 6,
+      "hpPerFloor": 3,
+      "attacks": [2, 5, 3],
+      "intents": [
+        "Il avance lentement.",
+        "Il lève son marteau.",
+        "Il frappe de côté."
+      ],
+      "intentEnglish": [
+        "It steps forward slowly.",
+        "It raises its hammer.",
+        "It swings from the side."
+      ]
+    },
+    {
+      "id": "boss",
+      "name": "La Reine des Échos",
+      "english": "The Echo Queen",
+      "symbol": "♛",
+      "hp": 22,
+      "hpPerFloor": 0,
+      "attacks": [3, 6, 4],
+      "intents": [
+        "Elle appelle les ombres.",
+        "Elle prépare une vague d’échos.",
+        "Elle fend le silence."
+      ],
+      "intentEnglish": [
+        "She calls the shadows.",
+        "She prepares a wave of echoes.",
+        "She cuts through the silence."
+      ]
+    }
+  ],
+  "rooms": {
+    "entry": { "fr": "Le seuil", "en": "Entrance", "symbol": "·" },
+    "enemy": { "fr": "Présence hostile", "en": "Enemy", "symbol": "♟" },
+    "treasure": {
+      "fr": "Trésor",
+      "en": "Treasure · choose equipment",
+      "symbol": "◇"
+    },
+    "camp": { "fr": "Fontaine", "en": "Fountain · one rest", "symbol": "❧" },
+    "merchant": {
+      "fr": "Marchand",
+      "en": "Merchant · supplies for gold",
+      "symbol": "⚖"
+    },
+    "shrine": {
+      "fr": "Autel",
+      "en": "Altar · health for treasure",
+      "symbol": "✦"
+    },
+    "npc": {
+      "fr": "Le veilleur",
+      "en": "Caretaker · a clue and a potion",
+      "symbol": "♙"
+    },
+    "gate": {
+      "fr": "Gardien et escalier",
+      "en": "Warden · next floor",
+      "symbol": "▥"
+    },
+    "boss": {
+      "fr": "La Reine des Échos",
+      "en": "Final boss · escape",
+      "symbol": "♛"
+    }
+  }
+}

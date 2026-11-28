@@ -1,36 +1,53 @@
 import "./style.css";
+import { registerSW } from "virtual:pwa-register";
+import { castle } from "./artwork";
 import vocab from "./content/vocabulary.json";
 import grammar from "./content/grammar.json";
 import encounters from "./content/encounters.json";
+import dungeon from "./content/dungeon.json";
 import verbs from "./content/verbs.json";
 import {
-  attack,
+  beginChallenge,
+  buy,
+  caretaker,
+  cast,
+  chooseDoor,
+  claimTreasure,
+  combatRoom,
   createRun,
-  finish,
-  layout,
+  currentRoom,
+  enemyIntent,
+  expectedAnswer,
+  helpChallenge,
   learn,
+  message,
   move,
   newSave,
+  offers,
+  rest,
+  retreat,
+  useItem,
 } from "./engine";
-import { checkAnswer, conjugate, phrase, subjects } from "./language";
-import { load, parseSave, save } from "./persistence";
+import { phrase, subjects } from "./language";
+import { legacyBackup, load, parseSave, save } from "./persistence";
 import { dueFirst } from "./learner";
-import type { Save } from "./types";
+import type { Kit, Run, Save } from "./types";
 const app = document.querySelector<HTMLDivElement>("#app")!;
-let state: Save = newSave();
-let panel = "explore",
-  gloss = "",
+let state: Save = newSave(),
+  screen: "game" | "settings" | "kits" = "game",
+  chosenKit: Kit = "frost",
   notice = "",
+  gloss = "",
   storageWarning = "",
   busy = false,
-  showEnglish = false,
-  typed = false;
-let dbUsable = true;
-function setBusy(value: boolean) {
-  busy = value;
-  app.inert = value;
-  app.setAttribute("aria-busy", String(value));
-}
+  dbUsable = true,
+  typed = false,
+  expandedMap = false,
+  bagOpen = false,
+  dismissed = "",
+  translationVisible = false;
+let updateAvailable = false;
+let updateApp: (reload?: boolean) => Promise<void> = async () => {};
 const escape = (s: unknown) =>
   String(s).replace(
     /[&<>"']/g,
@@ -41,183 +58,241 @@ const escape = (s: unknown) =>
   );
 const btn = (label: string, action: string, cls = "", disabled = false) =>
   `<button type="button" class="${cls}" data-action="${escape(action)}" ${disabled ? "disabled" : ""}>${label}</button>`;
-const castle = `<svg class="castle" viewBox="0 0 500 320" role="img" aria-label="Le château, sous la lune"><defs><linearGradient id="stone" x2="0" y2="1"><stop stop-color="#81978d"/><stop offset="1" stop-color="#233b3d"/></linearGradient></defs><circle cx="354" cy="60" r="39" fill="#eed49d"/><path d="M0 290 65 257 134 269 210 235 310 260 407 236 500 277V320H0Z" fill="#1a3033"/><g fill="url(#stone)" stroke="#13292b" stroke-width="3"><path d="M100 285V136h58v149m-66-148 37-59 37 59zM339 285V118h58v167m-66-167 37-65 37 65zM158 285V174h181v111M205 175v-68h83v68m-88-68 47-65 47 65z"/><path d="M176 175v-18h20v18h22v-18h22v18h23v-18h22v18h23v-18h20v18"/></g><g fill="#e8b66b"><path d="M122 175v-18a7 7 0 0 1 14 0v18zM361 159v-18a7 7 0 0 1 14 0v18zM240 141v-18a7 7 0 0 1 14 0v18z"/></g><path d="M222 285v-48a25 25 0 0 1 50 0v48" fill="#0c1b1e"/><path d="m224 285-36 35h120l-38-35" fill="#7e8a76"/><g fill="#91aa9a" opacity=".3"><ellipse cx="115" cy="285" rx="98" ry="10"/><ellipse cx="386" cy="298" rx="112" ry="9"/></g><g fill="#c6d4bd"><circle cx="65" cy="80" r="1.5"/><circle cx="190" cy="36" r="1.5"/><circle cx="423" cy="55" r="1.5"/><circle cx="301" cy="24" r="1"/></g></svg>`;
-function speak(text: string) {
-  if (state.settings.muted) return;
-  if (!("speechSynthesis" in window)) {
-    notice =
-      "La voix est indisponible. Le texte reste accessible gratuitement.";
-    return;
-  }
-  const voices = speechSynthesis.getVoices();
-  const voice = voices.find((v) => v.lang.startsWith("fr") && v.localService);
-  if (!voice) {
-    notice =
-      "Aucune voix française locale détectée. Lecture gratuite disponible ; vous pouvez installer une voix française sur votre appareil.";
-    return;
-  }
-  speechSynthesis.cancel();
-  const line = new SpeechSynthesisUtterance(text);
-  line.lang = "fr-FR";
-  line.rate = 0.85;
-  line.voice = voice;
-  line.onerror = () => {
-    notice = "La lecture audio a échoué. Utilisez le texte gratuit.";
-    render();
-  };
-  speechSynthesis.speak(line);
+const en = (s: string) =>
+  state.settings.translations
+    ? `<small class="translation">${escape(s)}</small>`
+    : "";
+const pair = (fr: string, english: string) => `${escape(fr)}${en(english)}`;
+function setBusy(value: boolean) {
+  busy = value;
+  app.setAttribute("aria-busy", String(value));
 }
 function localVoice() {
   return (
     "speechSynthesis" in window &&
     speechSynthesis
       .getVoices()
-      .some((v) => v.localService && v.lang.startsWith("fr"))
+      .some((v) => v.lang.startsWith("fr") && v.localService)
   );
 }
-function hint(id: string, english: string) {
-  const r = state.run!;
-  if (r.light <= 0) {
-    gloss = "Plus de lueurs. Relisez le contexte : vous pouvez continuer.";
+function speak(text: string) {
+  if (state.settings.muted) {
+    notice = "Le son est coupé. / Sound is muted. Text is always free.";
     return;
   }
-  r.light--;
-  learn(state, id, "hint");
-  gloss = english;
+  if (!("speechSynthesis" in window)) {
+    notice =
+      "La voix est indisponible. / Audio unavailable. Use the free text.";
+    return;
+  }
+  const voice = speechSynthesis
+    .getVoices()
+    .find((v) => v.lang.startsWith("fr") && v.localService);
+  if (!voice) {
+    notice =
+      "Aucune voix française locale. / No local French voice found. Use the free text, or install a French voice in your device settings.";
+    return;
+  }
+  speechSynthesis.cancel();
+  const line = new SpeechSynthesisUtterance(text);
+  line.voice = voice;
+  line.lang = "fr-FR";
+  line.rate = 0.85;
+  line.onerror = () => {
+    notice = "Lecture indisponible. / Audio failed; use the free text.";
+    render();
+  };
+  speechSynthesis.speak(line);
 }
-function nameOf(id: string) {
-  return (
-    vocab.find((v) => v.id === id)?.lemma ??
-    grammar.find((g) => g.id === id)?.verbId.replace("etre", "être") ??
-    "demander de l’aide"
-  );
-}
-function activeEncounter() {
-  const r = state.run!;
-  if (r.y === 4 && r.x === 3 && !r.npcDone) return "npc";
-  if (r.y === 2 && r.x === 3 && r.enemyHp > 0) return "fight";
-  if (r.y === 1) return "doors";
-  if (r.y === 3 && (r.x === 1 || r.x === 5) && !r.potionTaken) return "potion";
-  return "explore";
-}
-function pageHeader() {
+function header() {
   const r = state.run;
-  return `<header class="topbar"><a class="brand" href="./" aria-label="Le Donjon, accueil">♜ <span>LE DONJON</span></a><div class="header-actions"><span class="edition">LE CHÂTEAU DES ÉCHOS</span>${btn(state.settings.muted ? "Son coupé" : "♫ Son", "mute", "quiet")}${btn('⚙ <span class="sr-only">Réglages et sauvegarde</span>', "settings", "icon-button")}</div></header>${r && r.status === "playing" ? `<div class="statusbar"><span><span class="status-icon heart">♥</span> <b>${r.hp}</b><small> / 7 · vie</small></span><span><span class="status-icon gold">✦</span> <b>${r.light}</b><small> lueurs</small></span><span>⚿ <b>${r.key ? "1" : "0"}</b><small> clé</small></span><span class="tier">${state.learner.tier}</span></div>` : ""}`;
+  return `<header class="topbar"><a class="brand" href="./" aria-label="Le Donjon">♜ <span>LE DONJON</span></a><div class="header-actions">${btn(state.settings.translations ? "FR + EN" : "Français", "translations", "quiet")}${btn(state.settings.muted ? "Son coupé" : "♫ Son", "mute", "quiet")}${btn('⚙<span class="sr-only">Réglages / Settings</span>', "settings", "icon-button")}</div></header>${r?.status === "playing" && screen === "game" ? `<div class="statusbar"><span class="health"><span class="heart">♥</span> <b>${r.hp}</b><small>/${r.maxHp}</small></span><span class="mana">✦ <b>${r.mana}</b><small>/${r.maxMana}</small></span><span class="gold">◉ <b>${r.gold}</b></span><span class="tier">${r.floor} / 3</span></div>` : ""}`;
 }
 function welcome() {
-  const wins = state.history.filter((h) => h.won).length;
-  return `<main class="welcome"><div class="eyebrow">UNE AVENTURE EN FRANÇAIS</div><h1>Les murs ont<br>des <em>secrets.</em></h1><p class="intro">Écoutez les voix. Trouvez les mots.<br>Le château vous ouvrira ses portes.</p><div class="castle-frame">${castle}<span class="art-caption">LE CHÂTEAU DES ÉCHOS · CHAPITRE I</span></div><div class="welcome-bottom"><span class="eyebrow">01 / LE SEUIL</span><h2>Une lumière dans l’ombre</h2><p>Un veilleur, un gardien et deux portes.<br>Votre français est votre meilleur allié.</p>${btn(wins ? "Entrer à nouveau <span>→</span>" : "Entrer dans le château <span>→</span>", "start", "primary wide")}<div class="session-note">◷ 5–10 minutes <span>·</span> Sauvegarde automatique</div>${wins ? `<p class="unlock">✦ ${wins} évasion${wins > 1 ? "s" : ""} · Le titre « Éclaireur des Échos » est acquis.</p>` : ""}</div><footer>Sans compte. Sans publicité. Votre aventure reste ici.</footer></main>`;
+  return `<main class="welcome expedition-intro"><span class="eyebrow">LE CHÂTEAU DES ÉCHOS · EXPÉDITION II</span><h1>Trois étages.<br><em>Une seule vie.</em></h1><p class="intro">Choisissez votre voie. Apprenez les mots.<br>Survivez au château.${en("A new dungeon each run. Your equipment is lost on death; your French stays with you.")}</p><div class="castle-frame">${castle}</div><section class="kit-selection" aria-label="Choose your starting build"><span class="eyebrow">VOTRE PREMIER CHOIX / YOUR STARTING BUILD</span>${dungeon.kits.map((kit) => btn(`<span class="kit-symbol">${kit.symbol}</span><span><b>${kit.name}</b>${en(kit.english)}<span class="kit-description">${kit.description}</span>${en(kit.help)}</span><span class="kit-check">${chosenKit === kit.id ? "●" : "○"}</span>`, `kit:${kit.id}`, `kit ${chosenKit === kit.id ? "chosen" : ""}`)).join("")}</section><div class="welcome-bottom"><p class="rules-note">18 vie · 6 mana · 2 potions · 1 éther · 1 bombe${en("18 health · 6 mana · 2 healing potions · 1 ether · 1 bomb. Three randomized floors, then the Queen. No healing between floors.")}</p>${btn("Commencer l’expédition <span>→</span>", "start", "primary wide")}<p class="session-note">15–25 min · Reprise automatique${en("Autosave after every action. Close and resume any time.")}</p></div><footer>Gratuit. Hors ligne. Sans compte.${en("Free translations, examples and replay. No help currency.")}</footer></main>`;
 }
-function map() {
-  const r = state.run!;
-  return `<section class="map-section" aria-label="Plan du château"><div class="section-label"><span>REZ-DE-CHAUSSÉE</span><span>LE SEUIL · ${r.turns} pas</span></div><div class="dungeon" role="group" aria-label="Carte : touchez une case voisine pour avancer">${layout
+function map(r: Run) {
+  const fighting = !!combatRoom(r);
+  if (fighting && !expandedMap)
+    return `<section class="map-section"><div class="mapbar"><span>ÉTAGE ${r.floor} · ${dungeon.floors[r.floor - 1].name}</span>${btn("Voir le plan / Map", "map-toggle", "quiet")}</div></section>`;
+  return `<section class="map-section" aria-label="Dungeon map"><div class="section-label"><span>ÉTAGE ${r.floor} · PLAN DU CHÂTEAU</span><span>${r.turns} TOURS</span></div><div class="dungeon" role="group" aria-label="Move to an adjacent tile">${r.layout
     .flatMap((row, y) =>
       [...row].map((cell, x) => {
-        let symbol = "",
-          kind = cell === "#" ? "wall" : "floor",
-          label = "Couloir";
-        if (x === 3 && y === 4) {
-          symbol = r.npcDone ? "♙" : "♙";
-          label = "Éloi, le veilleur";
-          kind += " npc";
-        }
-        if (x === 3 && y === 2) {
-          symbol = r.enemyHp > 0 ? "♟" : "·";
-          label = r.enemyHp > 0 ? "Gardien spectral" : "Gardien apaisé";
-          kind += " enemy";
-        }
-        if (y === 1 && (x === 2 || x === 4)) {
-          symbol = "▥";
-          label = x === 2 ? "Porte à gauche" : "Porte à droite";
-          kind += " door";
-        }
-        if (y === 3 && (x === 1 || x === 5) && !r.potionTaken) {
-          symbol = "♜";
-          label = "Réserve de potions";
-          kind += " potion";
-        }
-        const player = x === r.x && y === r.y;
-        if (player) {
-          symbol = "◆";
-          label = "Votre position";
-          kind += " player";
-        }
-        const adjacent =
-          Math.abs(x - r.x) + Math.abs(y - r.y) === 1 && cell !== "#";
-        return cell === "#"
-          ? `<div class="cell ${kind}" aria-hidden="true"><i></i></div>`
-          : `<button class="cell ${kind} ${adjacent ? "reachable" : ""}" data-action="move:${x - r.x}:${y - r.y}" aria-label="${label}${adjacent ? " — avancer" : ""}" ${adjacent ? "" : "disabled"}>${symbol || '<span class="dot">·</span>'}</button>`;
+        if (cell === "#")
+          return '<div class="cell wall" aria-hidden="true"><i></i></div>';
+        const room = r.rooms.find((room) => room.x === x && room.y === y),
+          player = r.x === x && r.y === y,
+          adjacent = Math.abs(r.x - x) + Math.abs(r.y - y) === 1;
+        const data = room ? dungeon.rooms[room.type] : null;
+        const symbol = player
+          ? "◆"
+          : room
+            ? room.cleared && !["gate", "boss"].includes(room.type)
+              ? "✓"
+              : data!.symbol
+            : "·";
+        return `<button class="cell floor ${player ? "player" : ""} ${room?.type ?? ""} ${adjacent && !fighting ? "reachable" : ""} ${room?.cleared ? "cleared" : ""}" data-action="move:${x - r.x}:${y - r.y}" aria-label="${escape(player ? "Your position" : data ? data.fr + " / " + data.en : "Corridor")}${adjacent ? " — move" : ""}" ${!adjacent || fighting ? "disabled" : ""}>${symbol}</button>`;
       }),
     )
     .join(
       "",
-    )}</div><div class="map-legend"><span><i class="legend-player">◆</i> Vous</span><span>♙ Veilleur</span><span>♟ Gardien</span><span>▥ Porte</span></div><div class="controls" aria-label="Déplacement">${btn('↑<span class="sr-only">Avancer vers le haut</span>', "move:0:-1", "up")}${btn('←<span class="sr-only">Avancer à gauche</span>', "move:-1:0", "left")}${btn('↓<span class="sr-only">Avancer vers le bas</span>', "move:0:1", "down")}${btn('→<span class="sr-only">Avancer à droite</span>', "move:1:0", "right")}</div><p class="map-tip">Touchez une case voisine ou les flèches.</p></section>`;
+    )}</div><div class="map-legend"><span>◆ Vous / You</span><span>◇ Trésor</span><span>❧ Repos</span><span>▥ Escalier</span></div>${fighting ? btn("Masquer le plan / Hide map", "map-toggle", "quiet wide") : `<div class="controls" aria-label="Movement">${btn('↑<span class="sr-only">North</span>', "move:0:-1", "up")}${btn('←<span class="sr-only">West</span>', "move:-1:0", "left")}${btn('↓<span class="sr-only">South</span>', "move:0:1", "down")}${btn('→<span class="sr-only">East</span>', "move:1:0", "right")}</div><p class="map-tip">Touchez une case voisine.${en("Tap an adjacent tile. Room symbols show the risks before you enter.")}</p>`}</section>`;
 }
-function npc() {
-  const n = encounters.caretaker;
-  return `<div class="encounter-heading"><div class="portrait">♙</div><div><span class="eyebrow">UNE RENCONTRE</span><h2>${n.name}</h2></div></div><p class="dialogue">« ${escape(n.greeting)} »</p><div class="speech">${n.tokens.map((t) => (t.vocab ? btn(escape(t.text), `gloss:${t.vocab}`, "word") : escape(t.text))).join("")}</div><div class="inline-actions">${btn("♫ Écouter", "listen-npc", "quiet")}<small>Mot souligné : aide · 1 lueur</small></div><p class="question">${n.question}</p><div class="choices">${n.replies.map((r) => btn(escape(r.fr), `reply:${r.id}`, "choice")).join("")}</div><p class="fine-print">Une demande polie peut ouvrir bien des portes.</p>`;
+function inventory(r: Run) {
+  return `<section class="inventory"><div class="bag-heading">${btn(`Sac / Supplies <span>${r.potions} ♜ · ${r.ether} ✦ · ${r.bombs} ✹ ${bagOpen ? "−" : "+"}</span>`, "bag-toggle", "bag-button wide")}</div>${bagOpen ? `<div class="supply-grid">${btn(pair(`Potion ×${r.potions}`, "Restore " + (r.relics.includes("flask") ? "9" : "6") + " health"), "item:potion", "choice", r.potions === 0 || r.hp === r.maxHp)}${btn(pair(`Éther ×${r.ether}`, "Restore 4 mana"), "item:ether", "choice", r.ether === 0 || r.mana === r.maxMana)}${btn(pair(`Bombe ×${r.bombs}`, "8 damage · combat only"), "item:bomb", "choice", r.bombs === 0 || !combatRoom(r))}</div><p class="fine-print">${combatRoom(r) ? "En combat, boire ou lancer un objet utilise un tour." : "Vos réserves restent avec vous entre les étages."}${en(combatRoom(r) ? "Items take a turn. The enemy attacks unless frozen or defeated." : "Use supplies before a fight to avoid giving the enemy a turn.")}</p>` : ""}<div class="relic-strip" aria-label="Your build">${r.relics
+    .map((id) => {
+      const relic = dungeon.relics.find((relic) => relic.id === id)!;
+      return btn(`${relic.symbol} ${relic.name}`, `relic:${id}`, "relic-badge");
+    })
+    .join("")}</div></section>`;
 }
-function fight() {
-  const r = state.run!;
-  const incoming = r.enemyTurn % 2 === 0 ? 1 : 3;
-  const current = encounters.spells.find((s) => s.id === r.spell);
+function explore(r: Run) {
+  const room = currentRoom(r);
+  const cleared = r.rooms.filter(
+    (room) => room.cleared && room.type !== "entry",
+  ).length;
+  return `<span class="eyebrow">CHOISISSEZ VOTRE CHEMIN</span><h2>Chaque détour compte.</h2><p>Le gardien protège l’escalier. Les trésors changent vos sorts. Une fontaine peut vous sauver.${en("The warden guards the stairs. Optional rooms offer equipment, supplies or recovery. You can avoid fights, but the exit guardian must fall.")}</p><div class="route-key"><span>◇ <b>Trésor</b>${en("Choose one relic or supplies")}</span><span>❧ <b>Fontaine</b>${en("Choose health OR mana, once")}</span><span>⚖ <b>Marchand</b>${en("Spend gold on limited stock")}</span><span>✦ <b>Autel</b>${en("Pay 3 health for treasure")}</span></div><p class="fine-print">${cleared} / 8 salles explorées · ${r.kills} victoires${en("Enemies grow stronger by floor. Asking for language help never changes their stats.")}</p>${room && !["entry", "enemy"].includes(room.type) && (!room.cleared || ["gate", "boss"].includes(room.type)) ? btn("Examiner la salle / Interact", "interact", "choice wide") : ""}`;
+}
+function fight(r: Run) {
+  const room = combatRoom(r)!,
+    enemy = room.enemy!,
+    data = dungeon.enemies.find((e) => e.id === enemy.kind)!,
+    intent = enemyIntent(r)!,
+    c = r.challenge;
   const priority = dueFirst(
     state.learner,
     encounters.spells.map((s) => s.grammarId),
   );
-  return `<div class="encounter-heading"><div class="portrait ghost">♟</div><div><span class="eyebrow">LE PASSAGE EST GARDÉ</span><h2>Le gardien spectral</h2></div><b class="enemy-life">${r.enemyHp} / 6</b></div><div class="intent ${incoming === 3 ? "danger" : ""}">${incoming === 3 ? "⚡ Il prépare une attaque puissante." : "◇ Il lève lentement sa lance."}<strong>${incoming} dégât${incoming > 1 ? "s" : ""} à la riposte</strong></div>${
-    !current
-      ? `<p>La lumière traverse son armure. Quel sort choisissez-vous ?</p><div class="spells">${[
-          ...encounters.spells,
-        ]
-          .sort(
-            (a, b) =>
-              priority.indexOf(a.grammarId) - priority.indexOf(b.grammarId),
-          )
-          .map((s) =>
-            btn(
-              `<span class="spell-symbol">${s.id === "strike" ? "✧" : s.id === "shield" ? "◈" : "❧"}</span><span><b>${s.name}</b><small>${s.description}</small></span><span>→</span>`,
-              `spell:${s.id}`,
-              "spell",
-            ),
-          )
-          .join("")}</div>`
-      : `<div class="spell-prompt"><span class="eyebrow">${current.name.toUpperCase()} · ${verbs.find((v) => v.id === current.verbId)!.infinitive.toUpperCase()} AU PRÉSENT</span><h3>${subjects[r.person!]} …</h3><p>${current.flavor} Assemblez le sujet et le verbe.</p></div><div class="answer" aria-label="Votre formule">${r.selected!.length ? r.selected!.map((i) => btn(escape(r.tiles![i]), `untile:${i}`, "selected-tile")).join("") : "<span>Votre formule apparaît ici…</span>"}</div><div class="tile-bank">${r.tiles!.map((t, i) => btn(escape(t), `tile:${i}`, "tile", r.selected!.includes(i))).join("")}</div><div class="inline-actions">${btn("Effacer", "clear", "quiet")}${btn("Aide · 1 ✦", "spell-hint", "quiet", r.light === 0)}</div>${typed ? `<label class="text-label">Votre formule<input id="typed-answer" lang="fr" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Écrivez la formule"/><span class="accents">${[..."éèêçàâîôù", "œ"].map((a) => btn(a, `accent:${a}`, "accent")).join("")}</span></label>` : ""}${btn("Lancer le sort <span>✧</span>", "cast", "primary wide", !typed && !r.selected!.length)}<div class="inline-actions">${btn("Changer de sort", "cancel-spell", "quiet")}${btn(typed ? "Utiliser les tuiles" : "Écrire (+1 lueur si réussi)", "typing", "quiet")}</div>`
-  }`;
+  const spell = c && encounters.spells.find((spell) => spell.id === c.spell)!;
+  let body = "";
+  if (!c || !spell) {
+    body = `<p class="combat-instruction">Choisissez un sort, puis sa formule.${en("Choose a tactical action, then build its French formula. Free explanations are available before every cast.")}</p><div class="spells">${[
+      ...encounters.spells,
+    ]
+      .filter((s) => r.knownSpells.includes(s.id))
+      .sort(
+        (a, b) => priority.indexOf(a.grammarId) - priority.indexOf(b.grammarId),
+      )
+      .map((s) =>
+        btn(
+          `<span class="spell-symbol">${s.symbol}</span><span><b>${s.name} <i>${s.cost ? `${s.cost} ✦` : "0 ✦"}</i></b><small>${s.id === "strike" && r.relics.includes("ember") ? "4 dégâts. Sans mana." : s.id === "shield" && r.relics.includes("mirror") ? "Bloque la riposte et renvoie 4 dégâts." : s.description}</small>${en(s.id === "strike" && r.relics.includes("ember") ? "4 damage. No mana cost." : s.id === "shield" && r.relics.includes("mirror") ? "Block and reflect 4 damage." : s.english)}</span>`,
+          `spell:${s.id}`,
+          "spell",
+          r.mana < s.cost,
+        ),
+      )
+      .join("")}</div>`;
+  } else {
+    const level = r.support[spell.grammarId] ?? 0,
+      verb = verbs.find((v) => v.id === spell.verbId)!,
+      pattern = grammar.find((g) => g.id === spell.grammarId)!;
+    const example = phrase(spell.verbId, c.person === 0 ? 3 : 0);
+    body = `<div class="spell-prompt"><span class="eyebrow">${spell.name.toUpperCase()} · ${spell.cost} ✦</span><h3>${subjects[c.person]} … <span class="verb-label">${verb.infinitive}</span></h3>${en(`Present tense · ${subjects[c.person]} = ${["I", "you", "he", "we", "you (plural/polite)", "they"][c.person]} · ${verb.infinitive} = ${verb.english}`)}</div>${level === 0 ? `<div class="teaching"><b>Exemple : ${example}</b>${en(pattern.exampleEnglish)}<p>${pattern.tipFr}</p>${en(pattern.tipEn)}<small>Essai guidé : une erreur permet de réessayer gratuitement.${en("Guided: incorrect French gets a correction before any turn or mana is spent. The chosen spell still has tactical consequences.")}</small></div>` : `<p class="fine-print">${level === 1 ? "Formule accompagnée" : "Formule libre"}${en("Incorrect casting spends a turn and mana. Reveal the answer below for free whenever you need it.")}</p>`}
+  ${c.assisted || c.attempts > 0 ? `<div class="gloss"><b>${expectedAnswer(c)}</b><p>${pattern.explanation}</p><small>${escape(pattern.english)}</small>${btn("♫ Écouter / Listen", "listen-formula", "quiet")}</div>` : ""}
+  ${typed ? `<label class="text-label">Écrivez la formule / Type the formula<input id="typed-answer" lang="fr" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${subjects[c.person]} …"/><span class="accents">${[..."éèêçàâîôù", "œ"].map((a) => btn(a, `accent:${a}`, "accent")).join("")}</span></label>` : `<div class="answer" aria-label="Your formula">${c.selected.length ? c.selected.map((i) => btn(escape(c.tiles[i]), `untile:${i}`, "selected-tile")).join("") : "<span>Touchez le sujet, puis le verbe.<br>Tap the subject, then the verb.</span>"}</div><div class="tile-bank">${c.tiles.map((tile, i) => btn(escape(tile), `tile:${i}`, "tile", c.selected.includes(i))).join("")}</div>`}
+  <div class="inline-actions">${btn("Expliquer / Free help", "formula-help", "quiet")}${btn(typed ? "Tuiles / Tiles" : "Écrire / Type", "typing", "quiet")}</div>${btn("Lancer le sort / Cast <span>✧</span>", "cast", "primary wide", !typed && c.selected.length === 0)}${btn("Changer de sort / Choose another spell", "cancel-spell", "quiet wide")}`;
+  }
+  return `<div class="encounter-heading"><div class="portrait ghost">${data.symbol}</div><div><span class="eyebrow">${room.type === "boss" ? "RENCONTRE FINALE" : "COMBAT"}</span><h2>${data.name}</h2>${en(data.english)}</div><b class="enemy-life">${enemy.hp}/${enemy.maxHp} ♥</b></div><div class="intent ${intent.damage >= 4 ? "danger" : ""}">${intent.fr}${en(intent.en)}<strong>Riposte : ${intent.damage} dégâts / Next attack: ${intent.damage} damage</strong></div>${body}<div class="retreat">${btn("Fuir / Retreat · −2 ♥", "retreat", "quiet wide")}<small>${en("Retreat preserves enemy health and attack pattern. It can be fatal at 2 health or less.")}</small></div>`;
 }
-function doors() {
-  const r = state.run!;
-  const d = encounters.doors[r.doorSide];
-  const free = state.settings.captions || state.settings.muted || !localVoice();
-  return `<span class="eyebrow">LE DERNIER ÉCHO</span><h2>Deux portes. Une sortie.</h2><p>Une voix murmure derrière la pierre. Écoutez-la avant de choisir.</p><div class="listening-orb">♫</div>${btn("♫ Écouter la voix", "listen-door", "primary wide")}<div class="inline-actions">${btn(free ? "Lire la phrase · gratuit" : "Lire la phrase · 1 ✦", "reveal-door", "quiet", !free && !r.doorRevealed && r.light === 0)}</div>${r.doorRevealed ? `<blockquote>${d.fr}</blockquote>` : ""}${free ? '<p class="fine-print">Lecture gratuite : mode texte ou voix locale indisponible.</p>' : ""}<div class="door-choices">${btn("▥<span>Porte à gauche</span>", "door:left", "door-choice")}${btn("▥<span>Porte à droite</span>", "door:right", "door-choice")}</div>${!r.key ? '<p class="fine-print">Il vous manque une clé. Parlez au veilleur.</p>' : ""}${r.enemyHp > 0 ? '<p class="fine-print">Le gardien protège encore les serrures.</p>' : ""}`;
+function treasure(r: Run) {
+  const room = currentRoom(r)!,
+    shrine = room.type === "shrine";
+  return `<span class="eyebrow">${shrine ? "UN PRIX À PAYER" : "UN NOUVEAU POUVOIR"}</span><h2>${shrine ? "L’autel exige un sacrifice." : "Que garderez-vous ?"}</h2><p>${shrine ? "Offrez 3 points de vie pour un seul don." : "Choisissez un seul trésor. Les autres disparaîtront."}${en(shrine ? "Pay 3 health for ONE reward. You can leave and return later." : "Choose ONE reward. Build around your existing spells or prepare supplies for the next floor.")}</p><div class="choices">${offers(
+    r,
+    room,
+  )
+    .map((relic) =>
+      btn(
+        `<span class="reward-title">${relic.symbol} ${relic.name}</span>${en(relic.english)}<span class="reward-description">${relic.description}</span>${en(relic.help)}`,
+        `reward:${relic.id}`,
+        "choice reward",
+        shrine && r.hp <= 3,
+      ),
+    )
+    .join(
+      "",
+    )}${btn(`${pair("Des provisions", "Supplies")}<span class="reward-description">1 potion + 1 éther</span>${en("A health potion and a mana potion instead of a relic.")}`, "reward:supplies", "choice reward", shrine && r.hp <= 3)}</div>${btn("Repartir sans rien prendre / Leave for now", "dismiss-room", "quiet wide")}`;
 }
-function potion() {
-  return `<span class="eyebrow">LA RÉSERVE DU VEILLEUR</span><h2>Une gorgée de courage</h2><p>Deux fioles vous attendent. Que disait Éloi ?</p><div class="potion-bottles"><span class="bottle blue">♜</span><span class="bottle green">♜</span></div><div class="choices">${btn("Boire la potion bleue", "potion:blue", "choice")}${btn("Boire la potion verte", "potion:green", "choice")}${btn("Ne rien boire", "leave", "quiet")}</div><p class="fine-print">Vous ne pourrez prendre qu’une seule potion.</p>`;
+function camp() {
+  return `<span class="eyebrow">UNE SEULE OCCASION</span><h2>La fontaine des murmures</h2><p>L’eau peut soigner le corps ou raviver la magie. Choisissez.${en("One recovery choice, then this fountain is spent. It does not refill between visits.")}</p><div class="choices">${btn(pair("Soigner / +8 ♥", "Restore 8 health"), "rest:health", "choice", state.run!.hp === state.run!.maxHp)}${btn(pair("Raviver la magie / ✦", "Refill mana completely"), "rest:mana", "choice", state.run!.mana === state.run!.maxMana)}${btn("Garder la fontaine pour plus tard / Leave", "dismiss-room", "quiet")}</div>`;
 }
-function explore() {
-  const r = state.run!;
-  return `<span class="eyebrow">VOTRE OBJECTIF</span><h2>${!r.npcDone ? "Suivez la voix." : r.enemyHp > 0 ? "Passez le gardien." : "Trouvez la sortie."}</h2><p>${!r.npcDone ? "Le veilleur vous attend au nord. Peut-être connaît-il un chemin vers la sortie." : r.enemyHp > 0 ? "Le gardien est au centre de la galerie du haut. Les réserves, sur les côtés, peuvent vous aider." : "Les deux portes sont au nord. Une voix vous indiquera laquelle ouvrir."}</p><div class="objective"><span>01</span><p>Demander de l’aide ${r.npcDone ? "✓" : ""}</p></div><div class="objective"><span>02</span><p>Apaiser le gardien ${r.enemyHp === 0 ? "✓" : ""}</p></div><div class="objective"><span>03</span><p>Écouter et sortir</p></div><div class="flavor">« Ici, les mots ont du pouvoir.<br>Choisissez-les avec soin. »</div>${r.x === 3 && r.y === 4 ? btn("Reparler au veilleur", "revisit", "choice wide") : ""}`;
+function merchant() {
+  const r = state.run!,
+    room = currentRoom(r)!;
+  return `<span class="eyebrow">VOS PIÈCES, VOTRE CHOIX</span><h2>Le marchand sans ombre</h2><p>« Je ne vends pas la victoire. Seulement une chance de plus. »${en("Spend gold from victories. Each supply is stocked once. Buy now, use it when you need it.")}</p><div class="choices">${(
+    ["potion", "ether", "bomb"] as const
+  )
+    .map((id) => {
+      const cost = id === "bomb" ? 10 : 8;
+      return btn(
+        pair(
+          `${id === "potion" ? "Potion" : id === "ether" ? "Éther" : "Bombe"} · ${cost} ◉`,
+          id === "potion"
+            ? "Restore health"
+            : id === "ether"
+              ? "Restore mana"
+              : "8 damage in combat",
+        ),
+        `buy:${id}`,
+        "choice",
+        r.gold < cost || room.purchases.includes(id),
+      );
+    })
+    .join("")}${btn("Repartir / Leave", "dismiss-room", "quiet")}</div>`;
+}
+function npc() {
+  const n = encounters.caretaker;
+  return `<div class="encounter-heading"><div class="portrait">♙</div><div><span class="eyebrow">UN ALLIÉ DANS L’OMBRE</span><h2>${n.name}</h2>${en("A clue, a conversation, a supply")}</div></div><p>« Prenez une potion avant de descendre. »${en("Take a potion before descending.")}</p><div class="speech">${n.tokens.map((t) => (t.vocab ? btn(escape(t.text), `word:${t.vocab}`, "word") : escape(t.text))).join("")}</div><div class="inline-actions">${btn("♫ Écouter", "listen-npc", "quiet")}${btn("Traduire / Free translation", "translate-npc", "quiet")}</div>${translationVisible ? `<div class="gloss">The blue potion heals. The green one is poison. Take the blue one.</div>` : ""}<p>« Que prendrez-vous ? »${en("Which will you take? Tap underlined words for free meanings.")}</p><div class="choices">${btn(pair("Je prends la potion bleue.", "I’ll take the blue potion."), "npc:blue", "choice")}${btn(pair("Je prends la potion verte.", "I’ll take the green potion."), "npc:green", "choice")}${btn("Repartir / Leave", "dismiss-room", "quiet")}</div>`;
+}
+function doors(r: Run) {
+  const data = encounters.doors[r.exitSide],
+    id = data.vocab;
+  const guided =
+    (r.support[id] ?? 0) === 0 ||
+    state.settings.captions ||
+    state.settings.muted ||
+    !localVoice();
+  return `<span class="eyebrow">${r.floor === 3 ? "LA DERNIÈRE PORTE" : "L’ESCALIER EST LIBRE"}</span><h2>Écoutez le château.</h2><p>Une voix indique la bonne porte.${en(r.floor === 3 ? "The Queen is defeated. Follow the direction to escape." : "The guardian is defeated. Follow the direction to the next floor. Your resources will not refill.")}</p>${btn("♫ Écouter / Listen", "listen-door", "primary wide")}${guided || r.gateRead ? `<blockquote>${data.fr}${translationVisible ? `<small class="translation">${data.en}</small>` : ""}</blockquote>` : ""}<div class="inline-actions">${btn("Afficher le texte / Free text", "read-door", "quiet")}${btn("Traduire / Translate", "translate-door", "quiet")}</div><div class="door-choices">${btn("▥<span>À gauche</span>" + en("Left"), "door:left", "door-choice")}${btn("▥<span>À droite</span>" + en("Right"), "door:right", "door-choice")}</div><p class="fine-print">${en(guided ? "Guided directions: the French line is visible. Replay, translation and text are always free." : "Listening mode. Free text and translation are available whenever you need them.")}</p>`;
+}
+function encounter(r: Run) {
+  const room = currentRoom(r);
+  if (combatRoom(r)) return fight(r);
+  if (room && ["gate", "boss"].includes(room.type)) return doors(r);
+  if (room && !room.cleared && dismissed !== room.id) {
+    if (room.type === "treasure" || room.type === "shrine") return treasure(r);
+    if (room.type === "camp") return camp();
+    if (room.type === "merchant") return merchant();
+    if (room.type === "npc") return npc();
+  }
+  return explore(r);
+}
+function play(r: Run) {
+  const floor = dungeon.floors[r.floor - 1];
+  return `<main class="play ${combatRoom(r) ? "in-combat" : ""}"><div class="chapter-heading"><span class="eyebrow">EXPÉDITION · ÉTAGE ${r.floor} / 3</span><h1>${floor.name}</h1>${en(floor.english)}<p class="support-note">${en("Dungeon danger rises by floor. Language help is personal, free, and fixed for this run.")}</p></div><div class="game-layout">${map(r)}<section class="encounter card" aria-label="Current encounter">${encounter(r)}${gloss ? `<div class="gloss" role="status">${escape(gloss)}</div>` : ""}${inventory(r)}</section></div><div class="journal" role="status"><span>✎</span><p>${escape(r.log)}${en(r.logEn)}</p></div><div class="play-footer"><span>${dbUsable ? "● Autosave · sur cet appareil" : "○ Memory only · export your save"}</span>${btn("Carnet / Learning journal", "settings", "quiet")}</div></main>`;
+}
+function nameOf(id: string) {
+  return (
+    vocab.find((v) => v.id === id)?.lemma ??
+    verbs.find((v) => v.id === grammar.find((g) => g.id === id)?.verbId)
+      ?.infinitive ??
+    "demander de l’aide"
+  );
 }
 function debrief() {
   const r = state.run!,
-    h = state.history[0],
+    h = state.history.find((h) => h.at === r.startedAt),
     g = grammar.find((g) => g.id === h?.mistake);
-  return `<main class="debrief"><span class="eyebrow">CARNET D’AVENTURE · ${r.turns} PAS</span><div class="end-emblem">${r.status === "won" ? "✧" : "❧"}</div><h1>${r.status === "won" ? "L’aube vous attend." : "Votre lumière demeure."}</h1><p>${r.status === "won" ? "Les portes s’ouvrent. Le château se souviendra de vous." : "Le château vous retient… mais vos mots restent acquis."}</p><div class="debrief-grid"><section class="card"><span class="eyebrow">MOTS RENCONTRÉS</span><h2>Un peu plus de lumière</h2><div class="word-list">${(h?.newWords.length ? h.newWords : []).map((id) => `<span>${escape(nameOf(id))}</span>`).join("") || "<p>Des mots déjà familiers vous ont accompagné.</p>"}</div></section><section class="card"><span class="eyebrow">À RETROUVER BIENTÔT</span><h2>Les échos à revoir</h2><div class="word-list">${h?.struggled.map((id) => `<span>${escape(nameOf(id))}</span>`).join("") || "<p>Aucune difficulté enregistrée cette fois.</p>"}</div>${g ? `<p>${g.explanation}</p>` : "<p>Continuez à observer le sujet avant de choisir le verbe.</p>"}${showEnglish ? `<p class="english">${g?.english ?? "Look at the subject before choosing the verb."}</p>` : ""}${btn(showEnglish ? "Masquer l’anglais" : "English · bilan", "english", "quiet")}</section></div><p class="fine-print">${Object.keys(state.learner.items).length} éléments suivis · Parcours ${state.learner.tier}${r.status === "won" ? " · Titre acquis : Éclaireur des Échos" : ""}</p>${btn("Retourner au château <span>→</span>", "start", "primary")}<p class="fine-print">Une nouvelle tentative, des indices différents. Vos acquis restent avec vous.</p></main>`;
+  return `<main class="debrief"><span class="eyebrow">FIN D’EXPÉDITION · ÉTAGE ${r.floor} / 3</span><div class="end-emblem">${r.status === "won" ? "✧" : "❧"}</div><h1>${r.status === "won" ? "L’aube vous attend." : "Une vie s’éteint. Les mots restent."}</h1><p>${en(r.status === "won" ? "You escaped all three floors. Try a different build next time." : "This character, their gold and equipment are lost. Your vocabulary, mistakes and review schedule are preserved.")}</p><div class="run-stats"><span>${r.kills} victoires${en("Enemies defeated")}</span><span>${r.turns} tours${en("Turns taken")}</span><span>${r.relics.length} reliques${en("Relics collected")}</span></div><div class="debrief-grid"><section class="card"><span class="eyebrow">VOTRE FRANÇAIS</span><h2>Les mots emportés</h2><div class="word-list">${h?.newWords.map((id) => `<span>${escape(nameOf(id))}</span>`).join("") || "<p>Des mots déjà connus vous ont accompagné.</p>"}</div>${en(`${r.events.filter((e) => e.kind === "produced").length} independently correct spell formulas this run. Assisted answers are practice, not independent mastery.`)}</section><section class="card"><span class="eyebrow">LA PROCHAINE FOIS</span><h2>Les échos à revoir</h2><div class="word-list">${h?.struggled.map((id) => `<span>${escape(nameOf(id))}</span>`).join("") || "<p>Aucune difficulté enregistrée.</p>"}</div><p>${g?.explanation ?? "Observez le sujet, puis le verbe."}${en(g?.english ?? "Notice the subject before choosing the verb. Use free help whenever you need it.")}</p></section></div>${btn("Nouvelle expédition / New run →", "new-run", "primary")}<p class="fine-print">${en("Your next run recalculates language support from demonstrated knowledge. Enemies never weaken because of mistakes.")}</p></main>`;
 }
 function settings() {
-  return `<main class="settings card"><span class="eyebrow">VOTRE CARNET</span><h1>À votre rythme.</h1><p>Vos données restent sur cet appareil. Exportez votre carnet pour le conserver ailleurs.</p><div class="setting-row"><div><b>Sous-titres accessibles</b><small>Lecture gratuite des énigmes sonores.</small></div>${btn(state.settings.captions ? "Activés" : "Désactivés", "captions", "choice")}</div><div class="setting-row"><div><b>Voix française locale</b><small>${localVoice() ? "Disponible sur cet appareil." : "Indisponible : le texte reste gratuit."}</small></div>${btn("♫ Essayer", "test-voice", "quiet")}</div><div class="setting-row"><div><b>Progression</b><small>${Object.keys(state.learner.items).length} éléments · ${state.history.length} aventures · ${state.learner.tier}</small></div></div><div class="choices">${btn("Exporter le carnet (.json)", "export", "choice")}<label class="choice import-label">Importer un carnet (.json)<input id="import" type="file" accept="application/json,.json"/></label>${btn("Protéger le stockage sur cet appareil", "persist", "choice")}${btn("Revenir à l’aventure →", "back", "primary")}</div><p class="fine-print">Une importation valide remplace le carnet actuel. Une copie est exportée avant le remplacement. Le navigateur peut effacer les données ; gardez une sauvegarde.</p></main>`;
+  const due = dueFirst(state.learner, Object.keys(state.learner.items))
+    .filter((id) => state.learner.items[id].dueAt <= Date.now())
+    .slice(0, 8);
+  return `<main class="settings card"><span class="eyebrow">VOTRE CARNET / YOUR JOURNAL</span><h1>À votre rythme.</h1><p>Vos données restent sur cet appareil.${en("Export regularly: browsers can evict local storage. No account, tracking or server.")}</p><div class="setting-row"><div><b>Traductions anglaises</b><small>English explanations and game instructions</small></div>${btn(state.settings.translations ? "Activées" : "Désactivées", "translations", "choice")}</div><div class="setting-row"><div><b>Sous-titres</b><small>Always show free listening transcripts</small></div>${btn(state.settings.captions ? "Activés" : "Désactivés", "captions", "choice")}</div><div class="setting-row"><div><b>Voix locale</b><small>${localVoice() ? "French voice available" : "No local French voice. Free text remains available."}</small></div>${btn("♫ Test", "test-voice", "quiet")}</div><p>${Object.keys(state.learner.items).length} éléments suivis · ${state.history.length} expéditions${en("Support is based on each grammar pattern, not XP. Guided → coached → independent, with free help at every stage.")}</p><div class="word-list">${due.map((id) => `<span>${escape(nameOf(id))}</span>`).join("")}</div>${state.migrated ? `<div class="migration-note"><b>Votre français est conservé.</b><p>The old single-floor run was archived in your history. Start a new expedition under the new rules. An original local backup is retained on the device where it was upgraded.</p>${btn("Exporter l’ancien carnet / Original backup", "legacy-export", "quiet")}${btn("Compris / Dismiss migration notice", "ack-migration", "quiet")}</div>` : ""}<div class="choices">${btn("Exporter le carnet / Export JSON", "export", "choice")}<label class="choice import-label">Importer un carnet / Import JSON<input id="import" type="file" accept="application/json,.json"/></label>${btn("Protéger le stockage / Request persistent storage", "persist", "choice")}${btn("Retour / Back →", "back", "primary")}</div><p class="fine-print">Import validates the file, downloads a copy of your current save, then replaces it. Old version-1 learning records are supported. Backup downloads depend on your browser’s download permissions.</p></main>`;
 }
 function render() {
   const focused = (document.activeElement as HTMLElement)?.dataset.action;
-  let body =
-    panel === "settings"
-      ? settings()
-      : !state.run
-        ? welcome()
-        : state.run.status !== "playing"
-          ? debrief()
-          : `<main class="play"><div class="chapter-heading"><span class="eyebrow">CHAPITRE I</span><h1>Le seuil des Échos</h1><p>Chaque mot peut ouvrir un passage.</p></div><div class="game-layout">${map()}<section class="encounter card" aria-label="Rencontre">${panel === "npc" ? npc() : panel === "fight" ? fight() : panel === "doors" ? doors() : panel === "potion" ? potion() : explore()}${gloss ? `<div class="gloss" role="status">${escape(gloss)}</div>` : ""}</section></div><div class="journal" role="status"><span>✎</span><p>${escape(state.run.log)}</p></div><div class="play-footer"><span>${dbUsable ? "● Carnet enregistré sur cet appareil" : "○ Carnet en mémoire seulement"}</span>${btn("Carnet et réglages", "settings", "quiet")}</div></main>`;
-  app.innerHTML = `${pageHeader()}${storageWarning ? `<div class="warning" role="alert">${escape(storageWarning)}</div>` : ""}${notice ? `<div class="notice" role="status">${escape(notice)} ${btn("Fermer", "dismiss", "quiet")}</div>` : ""}${body}`;
+  app.innerHTML = `${header()}${updateAvailable ? `<div class="notice">Une nouvelle version est disponible. / An update is ready. Your run will be saved first. ${btn("Mettre à jour / Update", "update-app", "primary")}</div>` : ""}${storageWarning ? `<div class="warning" role="alert">${escape(storageWarning)}</div>` : ""}${notice ? `<div class="notice" role="status">${escape(notice)} ${btn("Fermer / Close", "dismiss-notice", "quiet")}</div>` : ""}${state.migrated && screen !== "settings" ? `<div class="notice">Your learning has been preserved. The old single-floor run is archived; choose a new build to enter the new dungeon. ${btn("Details / Backup", "settings", "quiet")}</div>` : ""}${screen === "settings" ? settings() : screen === "kits" || !state.run ? welcome() : state.run.status === "playing" ? play(state.run) : debrief()}`;
   if (focused)
     Array.from(app.querySelectorAll<HTMLButtonElement>("button[data-action]"))
       .find((b) => b.dataset.action === focused && !b.disabled)
@@ -231,301 +306,309 @@ async function persist() {
   } catch {
     dbUsable = false;
     storageWarning =
-      "La sauvegarde locale est indisponible. Exportez votre carnet avant de fermer cette page.";
+      "Autosave is unavailable. Export your journal before closing this page.";
   }
 }
-function exportSave() {
+function exportData(data: unknown, name = "le-donjon") {
   const url = URL.createObjectURL(
-    new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
+    new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
   );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `le-donjon-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name}-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function beginSpell(id: string) {
-  const r = state.run!,
-    s = encounters.spells.find((s) => s.id === id)!;
-  r.spell = id;
-
-  const person =
-    state.learner.tier === "A1"
-      ? [0, 3, 4][(r.enemyTurn + r.seed) % 3]
-      : (r.enemyTurn + r.seed) % 6;
-  r.person = person;
-  r.selected = [];
-  r.assisted = false;
-  const expected = conjugate(s.verbId, person);
-  const subject = phrase(s.verbId, person).startsWith("j’")
-    ? "j’"
-    : subjects[person];
-  r.tiles = [
-    subject,
-    expected,
-    ...[
-      ...new Set([
-        conjugate(s.verbId, (person + 1) % 6),
-        conjugate(s.verbId, (person + 2) % 6),
-        subjects[(person + 2) % 6],
-      ]),
-    ].filter((t) => t !== expected && t !== subject),
-  ];
-  // Fisher–Yates: tile order is saved and survives reloads.
-  for (let i = r.tiles.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [r.tiles[i], r.tiles[j]] = [r.tiles[j], r.tiles[i]];
-  }
-  learn(state, s.grammarId, "seen");
 }
 async function act(action: string) {
   const [a, b, c] = action.split(":");
   const r = state.run;
-  if (a === "dismiss") {
+  if (a === "update-app") {
+    await persist();
+    await updateApp(true);
+    return;
+  }
+  if (a === "dismiss-notice") {
     notice = "";
-    render();
+    return;
+  }
+  if (a === "translations") {
+    state.settings.translations = !state.settings.translations;
     return;
   }
   if (a === "mute") {
     state.settings.muted = !state.settings.muted;
     if ("speechSynthesis" in window) speechSynthesis.cancel();
+    return;
   }
   if (a === "settings") {
-    panel = "settings";
-    gloss = "";
+    screen = "settings";
+    return;
   }
-  if (a === "back")
-    panel = r && r.status === "playing" ? activeEncounter() : "explore";
-  if (a === "captions") state.settings.captions = !state.settings.captions;
-  if (a === "test-voice") speak("Bienvenue au Château des Échos.");
+  if (a === "back") {
+    screen = "game";
+    return;
+  }
+  if (a === "captions") {
+    state.settings.captions = !state.settings.captions;
+    return;
+  }
+  if (a === "test-voice") {
+    speak("Bienvenue au Château des Échos.");
+    return;
+  }
   if (a === "export") {
-    exportSave();
+    exportData(state);
+    return;
+  }
+  if (a === "legacy-export") {
+    const backup = await legacyBackup();
+    if (backup) exportData(backup, "le-donjon-v1");
+    else
+      notice =
+        "Original backup is on the device where the save was upgraded. Your imported learning records are already included in your current export.";
+    return;
+  }
+  if (a === "ack-migration") {
+    state.migrated = false;
     return;
   }
   if (a === "persist") {
     try {
-      const yes = await navigator.storage?.persist?.();
-      notice = yes
-        ? "Le stockage est protégé. Gardez aussi une copie exportée."
-        : "Le navigateur ne garantit pas la conservation. Exportez votre carnet.";
+      notice = (await navigator.storage?.persist?.())
+        ? "Persistent storage granted. Keep an exported backup too."
+        : "The browser cannot guarantee retention. Export a backup.";
     } catch {
-      notice = "Protection indisponible. Exportez votre carnet.";
+      notice = "Storage protection unavailable. Export a backup.";
     }
+    return;
   }
-  if (a === "english") showEnglish = !showEnglish;
+  if (a === "new-run") {
+    screen = "kits";
+    return;
+  }
+  if (a === "kit") {
+    if (dungeon.kits.some((k) => k.id === b)) chosenKit = b as Kit;
+    return;
+  }
   if (a === "start") {
-    state.run = createRun();
-    panel = "explore";
+    state.run = createRun(undefined, state.learner, chosenKit);
+    screen = "game";
+    dismissed = "";
     gloss = "";
-    showEnglish = false;
+    expandedMap = false;
     notice = "";
-    for (const id of dueFirst(state.learner, ["droite", "gauche"])) {
-      if (state.learner.items[id]) {
-        state.run.doorSide = id === "droite" ? "right" : "left";
-        break;
-      }
-    }
-    if ("speechSynthesis" in window) speechSynthesis.getVoices();
+    return;
   }
-  if (r && r.status === "playing") {
-    if (a === "move") {
-      if (panel === "fight" && r.enemyHp > 0) {
-        r.log = "Le gardien bloque le passage. Apaisez-le pour avancer.";
-      } else if (move(r, Number(b), Number(c))) {
-        gloss = "";
-        panel = activeEncounter();
-        if (panel === "npc") {
-          learn(state, "bleue", "seen");
-          learn(state, "verte", "seen");
-          learn(state, "soigner", "seen");
-          learn(state, "poison", "seen");
-          learn(state, "sortie", "seen");
-        }
-        if (panel === "potion") r.log = "Deux fioles brillent dans une niche.";
-        if (panel === "fight") {
-          learn(state, "gardien", "seen");
-          r.log = "Le gardien : « Montrez-moi le pouvoir de vos mots. »";
-        }
-      }
-    }
-    if (a === "revisit") {
-      panel = "npc";
-    }
-    if (a === "gloss") {
-      const word = vocab.find((v) => v.id === b);
-      if (word) hint(word.id, word.english);
-    }
-    if (a === "listen-npc") speak(encounters.caretaker.clue);
-    if (a === "reply") {
-      const reply = encounters.caretaker.replies.find((t) => t.id === b)!;
-      if (reply.correct) {
-        if (!r.npcDone) learn(state, "dialogue-help", "understood");
-        r.npcDone = true;
-        r.key = true;
-        r.log = encounters.caretaker.success;
-        panel = "explore";
-        gloss = "";
-      } else {
-        learn(state, "dialogue-help", "failed");
-        r.log = encounters.caretaker.failure;
-        gloss = "Pour partir, demandez de l’aide au veilleur.";
-      }
-    }
-    if (a === "potion" && !r.potionTaken) {
-      r.potionTaken = true;
-      r.turns++;
-      learn(state, "bleue", b === "blue" ? "understood" : "failed");
-      learn(state, "poison", b === "blue" ? "understood" : "failed");
-      if (b === "blue") {
-        r.hp = 7;
-        r.log =
-          "La potion bleue vous soigne. Vous retrouvez toute votre énergie.";
-      } else {
-        r.hp = Math.max(1, r.hp - 2);
-        r.log =
-          "Oups ! La verte est un poison. La bleue soigne. Vous perdez 2 points de vie, mais vous tenez debout.";
-      }
-      panel = "explore";
-    }
-    if (a === "leave") panel = "explore";
-    if (a === "spell") beginSpell(b);
-    if (a === "cancel-spell") {
-      delete r.spell;
-      gloss = "";
-    }
-    if (a === "tile" && r.tiles && !r.selected!.includes(Number(b)))
-      r.selected!.push(Number(b));
-    if (a === "untile") r.selected = r.selected!.filter((i) => i !== Number(b));
-    if (a === "clear") r.selected = [];
-    if (a === "typing") typed = !typed;
-    if (a === "accent") {
-      const input = document.querySelector<HTMLInputElement>("#typed-answer");
-      if (input) {
-        input.setRangeText(
-          b,
-          input.selectionStart ?? input.value.length,
-          input.selectionEnd ?? input.value.length,
-          "end",
-        );
-        input.focus();
-      }
-      return;
-    }
-    if (a === "spell-hint" && r.spell) {
-      const spell = encounters.spells.find((s) => s.id === r.spell)!;
-      if (r.light > 0) {
-        r.assisted = true;
-        hint(
-          spell.grammarId,
-          `${phrase(spell.verbId, r.person!)} — ${verbs.find((v) => v.id === spell.verbId)!.english}`,
-        );
-      }
-    }
-    if (a === "cast" && r.spell) {
-      const s = encounters.spells.find((s) => s.id === r.spell)!;
-      const expected = phrase(s.verbId, r.person!);
-      const input = document.querySelector<HTMLInputElement>("#typed-answer");
-      const answer = typed
-        ? (input?.value ?? "")
-        : r.selected!.map((i) => r.tiles![i]).join(" ");
-      const result = checkAnswer(answer, expected);
-      if (result.correct) {
-        if (!r.assisted) learn(state, s.grammarId, "produced");
-        if (typed && !r.assisted) r.light = Math.min(9, r.light + 1);
-        r.log = `« ${expected} » — ${s.name} ! ${result.accentNote ? "Pensez aux accents : " + expected + "." : ""}`;
-      } else {
-        learn(state, s.grammarId, "failed");
-        r.log = `Le sort fait… pouf ! On dit « ${expected} ». ${grammar.find((g) => g.id === s.grammarId)!.explanation}`;
-      }
-      attack(r, s.id, result.correct);
-      delete r.spell;
-      gloss = "";
-      if (r.enemyHp === 0) {
-        r.log += " Le gardien s’incline. Les portes sont libres.";
-        r.light = Math.min(9, r.light + 1);
-        panel = "explore";
-      }
-      if (r.hp === 0) finish(state);
-    }
-    if (a === "listen-door") {
-      r.heard = true;
-      speak(encounters.doors[r.doorSide].fr);
-      learn(state, encounters.doors[r.doorSide].vocab, "seen");
-    }
-    if (a === "reveal-door" && !r.doorRevealed) {
-      const free =
-        state.settings.captions || state.settings.muted || !localVoice();
-      if (free || r.light > 0) {
-        r.doorRevealed = true;
-        r.doorAssisted = !free;
-        if (!free) {
-          r.light--;
-          learn(state, encounters.doors[r.doorSide].vocab, "hint");
-        }
-        learn(state, encounters.doors[r.doorSide].vocab, "seen");
-      }
-    }
-    if (a === "door") {
-      if (!r.key)
-        r.log = "La serrure résiste. Le veilleur possède peut-être une clé.";
-      else if (r.enemyHp > 0)
-        r.log =
-          "Le gardien retient la porte. Retrouvez-le au centre de la galerie.";
-      else if (!r.heard && !r.doorRevealed)
-        r.log = "Écoutez ou lisez d’abord le message de la porte.";
-      else if (b === r.doorSide) {
-        if (!r.doorAssisted)
-          learn(state, encounters.doors[r.doorSide].vocab, "understood");
-        r.status = "won";
-        finish(state);
-      } else {
-        learn(state, encounters.doors[r.doorSide].vocab, "failed");
-        r.hp = Math.max(1, r.hp - 1);
-        r.log =
-          "Un placard à balais ! Une araignée vous surprend (−1 vie). Écoutez encore : « " +
-          encounters.doors[r.doorSide].fr +
-          " »";
-        r.doorRevealed = true;
-        r.doorAssisted = true;
-      }
-    }
+  if (!r || r.status !== "playing") return;
+  if (a === "map-toggle") {
+    expandedMap = !expandedMap;
+    return;
   }
-  await persist();
-  render();
+  if (a === "bag-toggle") {
+    bagOpen = !bagOpen;
+    return;
+  }
+  if (a === "relic") {
+    const relic = dungeon.relics.find((relic) => relic.id === b);
+    if (relic) gloss = `${relic.name} — ${relic.help}`;
+    return;
+  }
+  if (a === "move") {
+    if (move(r, Number(b), Number(c))) {
+      dismissed = "";
+      gloss = "";
+      translationVisible = false;
+      expandedMap = false;
+      const room = currentRoom(r);
+      if (room?.type === "npc" && !room.cleared)
+        for (const id of ["bleue", "verte", "poison", "soigner"])
+          learn(state, id, "seen");
+    }
+    return;
+  }
+  if (a === "dismiss-room") {
+    dismissed = currentRoom(r)?.id ?? "";
+    return;
+  }
+  if (a === "interact") {
+    dismissed = "";
+    return;
+  }
+  if (a === "spell") {
+    if (beginChallenge(state, b)) {
+      gloss = "";
+      typed = false;
+    }
+    return;
+  }
+  if (a === "tile" && r.challenge) {
+    const i = Number(b);
+    if (
+      Number.isInteger(i) &&
+      i >= 0 &&
+      i < r.challenge.tiles.length &&
+      !r.challenge.selected.includes(i)
+    )
+      r.challenge.selected.push(i);
+    return;
+  }
+  if (a === "untile" && r.challenge) {
+    r.challenge.selected = r.challenge.selected.filter((i) => i !== Number(b));
+    return;
+  }
+  if (a === "typing") {
+    typed = !typed;
+    return;
+  }
+  if (a === "formula-help") {
+    helpChallenge(state);
+    return;
+  }
+  if (a === "listen-formula" && r.challenge) {
+    speak(expectedAnswer(r.challenge));
+    return;
+  }
+  if (a === "cancel-spell") {
+    delete r.challenge;
+    return;
+  }
+  if (a === "cast" && r.challenge) {
+    const answer = typed
+      ? (document.querySelector<HTMLInputElement>("#typed-answer")?.value ?? "")
+      : r.challenge.selected.map((i) => r.challenge!.tiles[i]).join(" ");
+    cast(state, answer);
+    return;
+  }
+  if (a === "retreat") {
+    retreat(state);
+    expandedMap = false;
+    gloss = "";
+    return;
+  }
+  if (a === "item" && ["potion", "ether", "bomb"].includes(b)) {
+    useItem(state, b as "potion" | "ether" | "bomb");
+    return;
+  }
+  if (a === "reward") {
+    claimTreasure(r, b);
+    return;
+  }
+  if (a === "rest" && ["health", "mana"].includes(b)) {
+    rest(r, b as "health" | "mana");
+    return;
+  }
+  if (a === "buy" && ["potion", "ether", "bomb"].includes(b)) {
+    buy(r, b as "potion" | "ether" | "bomb");
+    return;
+  }
+  if (a === "npc" && ["blue", "green"].includes(b)) {
+    caretaker(state, b as "blue" | "green");
+    return;
+  }
+  if (a === "word") {
+    const word = vocab.find((v) => v.id === b);
+    if (word) {
+      learn(state, word.id, "hint");
+      gloss = `${word.lemma} — ${word.english}`;
+      speak(word.lemma);
+    }
+    return;
+  }
+  if (a === "listen-npc") {
+    speak(encounters.caretaker.clue);
+    return;
+  }
+  if (a === "translate-npc") {
+    translationVisible = !translationVisible;
+    if (translationVisible)
+      for (const id of ["bleue", "poison"]) learn(state, id, "hint");
+    return;
+  }
+  if (a === "listen-door") {
+    r.gateHeard = true;
+    learn(state, encounters.doors[r.exitSide].vocab, "seen");
+    speak(encounters.doors[r.exitSide].fr);
+    return;
+  }
+  if (a === "read-door") {
+    r.gateRead = true;
+    learn(state, encounters.doors[r.exitSide].vocab, "seen");
+    return;
+  }
+  if (a === "translate-door") {
+    translationVisible = !translationVisible;
+    r.gateRead = true;
+    if (translationVisible) {
+      r.gateAssisted = true;
+      learn(state, encounters.doors[r.exitSide].vocab, "hint");
+    }
+    return;
+  }
+  if (a === "door" && ["left", "right"].includes(b)) {
+    const guided =
+      (r.support[encounters.doors[r.exitSide].vocab] ?? 0) === 0 ||
+      state.settings.captions ||
+      state.settings.muted ||
+      !localVoice();
+    if (guided) r.gateRead = true;
+    if (chooseDoor(state, b as "left" | "right")) {
+      dismissed = "";
+      gloss = "";
+      translationVisible = false;
+      expandedMap = false;
+    }
+    return;
+  }
 }
 app.addEventListener("click", async (e) => {
-  const b = (e.target as HTMLElement).closest<HTMLButtonElement>(
+  const button = (e.target as HTMLElement).closest<HTMLButtonElement>(
     "[data-action]",
   );
-  if (!b || b.disabled || busy) return;
+  if (!button || button.disabled || busy) return;
+  const action = button.dataset.action!;
+  if (action.startsWith("accent:")) {
+    const input = document.querySelector<HTMLInputElement>("#typed-answer");
+    if (input) {
+      input.setRangeText(
+        action.slice(7),
+        input.selectionStart ?? input.value.length,
+        input.selectionEnd ?? input.value.length,
+        "end",
+      );
+      input.focus();
+    }
+    return;
+  }
   setBusy(true);
   try {
-    await act(b.dataset.action!);
-  } catch (err) {
-    notice =
-      "Cette action n’a pas abouti. Votre carnet reste accessible dans les réglages.";
-    console.error(err);
-    render();
+    await act(action);
+    await persist();
+  } catch (error) {
+    console.error(error);
+    notice = "Action unavailable. Your journal can be exported from settings.";
   } finally {
     setBusy(false);
+    render();
   }
 });
 app.addEventListener("change", async (e) => {
   const input = e.target as HTMLInputElement;
-  if (input.id !== "import" || !input.files?.[0]) return;
+  if (input.id !== "import" || !input.files?.[0] || busy) return;
   setBusy(true);
   try {
     const file = input.files[0];
-    if (file.size > 2_000_000) throw new Error("Fichier trop volumineux.");
+    if (file.size > 2_000_000) throw new Error("Too large");
     const imported = parseSave(await file.text());
-    exportSave();
+    exportData(state, "le-donjon-before-import");
     state = imported;
-    panel = state.run?.status === "playing" ? activeEncounter() : "explore";
-    notice = "Carnet importé. Une copie du carnet précédent a été exportée.";
+    screen = "game";
+    gloss = "";
+    notice =
+      "Carnet importé. / Save imported. A copy of your previous journal was downloaded.";
     await persist();
   } catch {
     notice =
-      "Import refusé : fichier invalide ou incompatible. Votre carnet actuel est conservé.";
+      "Import refusé. / Invalid or incompatible file. Your current journal is unchanged.";
   } finally {
     setBusy(false);
     render();
@@ -533,14 +616,21 @@ app.addEventListener("change", async (e) => {
 });
 if ("speechSynthesis" in window)
   speechSynthesis.addEventListener("voiceschanged", () => {
-    if (panel === "settings" || panel === "doors") render();
+    if (screen === "settings") render();
   });
 try {
   state = await load();
-  panel = state.run?.status === "playing" ? activeEncounter() : "explore";
 } catch {
   dbUsable = false;
   storageWarning =
-    "Le carnet local ne peut pas être lu. Exportez votre partie avant de quitter ; aucune donnée existante ne sera remplacée sans action.";
+    "Your local save could not be read. Export any in-memory progress before leaving. Existing data is not replaced until you take an action.";
 }
 render();
+
+updateApp = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    updateAvailable = true;
+    render();
+  },
+});

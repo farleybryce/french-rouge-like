@@ -6,7 +6,10 @@
     "tense": "present",
     "explanation": "Avec « vous », on dit « vous faites », sans -s après le t.",
     "english": "With vous, use faites.",
-    "needs_review": false
+    "needs_review": false,
+    "tipFr": "Faire est irrégulier. Observez le sujet avant de choisir la forme.",
+    "tipEn": "Faire is irregular. Match the verb form to the subject.",
+    "exampleEnglish": "I do / I make"
   },
   {
     "id": "present-etre",
@@ -15,7 +18,10 @@
     "tense": "present",
     "explanation": "Être change selon le sujet : je suis, nous sommes, vous êtes.",
     "english": "Être is irregular: je suis, nous sommes, vous êtes.",
-    "needs_review": false
+    "needs_review": false,
+    "tipFr": "Être est irrégulier. Chaque sujet a sa propre forme.",
+    "tipEn": "Être is irregular. Each subject takes its own form.",
+    "exampleEnglish": "I am"
   },
   {
     "id": "present-avoir",
@@ -24,6 +30,33 @@
     "tense": "present",
     "explanation": "Devant « ai », « je » devient « j’ » : j’ai.",
     "english": "Je becomes j’ before ai: j’ai.",
-    "needs_review": false
+    "needs_review": false,
+    "tipFr": "Avoir est irrégulier. Le sujet indique la forme à choisir.",
+    "tipEn": "Avoir is irregular. The subject tells you which form to choose.",
+    "exampleEnglish": "I have"
+  },
+  {
+    "id": "present-aller",
+    "verbId": "aller",
+    "tier": "A1",
+    "tense": "present",
+    "explanation": "Aller est irrégulier : je vais, nous allons, vous allez.",
+    "english": "Aller (to go) is irregular: je vais, nous allons, vous allez.",
+    "needs_review": false,
+    "tipFr": "Aller change beaucoup de forme au présent.",
+    "tipEn": "Aller changes form considerably in the present tense.",
+    "exampleEnglish": "I go"
+  },
+  {
+    "id": "present-vouloir",
+    "verbId": "vouloir",
+    "tier": "A2",
+    "tense": "present",
+    "explanation": "Avec nous et vous : nous voulons, vous voulez.",
+    "english": "Vouloir means to want: nous voulons (we want), vous voulez (you want).",
+    "needs_review": false,
+    "tipFr": "Avec nous et vous, le radical est voul-.",
+    "tipEn": "With nous and vous, use the stem voul-.",
+    "exampleEnglish": "I want"
   }
 ]

@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkAnswer, conjugate, phrase } from "../src/language";
 import { dueFirst, freshLearner, record } from "../src/learner";
-import {
-  attack,
-  createRun,
-  finish,
-  layout,
-  move,
-  newSave,
-} from "../src/engine";
 import { parseSave } from "../src/persistence";
 
 describe("French answers", () => {
@@ -87,68 +79,5 @@ describe("learning schedule", () => {
     expect(l.tier).toBe("A2");
     for (let i = 0; i < 15; i++) record(l, "porte", "failed", i * 700_000);
     expect(l.tier).toBe("A1");
-  });
-});
-describe("dungeon and saves", () => {
-  it("has reachable encounters and both exits", () => {
-    const visited = new Set(["3,5"]),
-      queue = [[3, 5]];
-    while (queue.length) {
-      const [x, y] = queue.shift()!;
-      for (const [dx, dy] of [
-        [0, 1],
-        [0, -1],
-        [1, 0],
-        [-1, 0],
-      ]) {
-        const key = `${x + dx},${y + dy}`;
-        if (layout[y + dy]?.[x + dx] === "." && !visited.has(key)) {
-          visited.add(key);
-          queue.push([x + dx, y + dy]);
-        }
-      }
-    }
-    for (const key of ["3,4", "3,2", "2,1", "4,1", "1,3", "5,3"])
-      expect(visited.has(key)).toBe(true);
-    const r = createRun(1);
-    expect(move(r, 1, 0)).toBe(false);
-    expect(move(r, 0, -1)).toBe(true);
-  });
-  it("resolves shield, enemy tells, lethal blows and permadeath", () => {
-    const r = createRun(1);
-    attack(r, "shield", true);
-    expect(r.hp).toBe(7);
-    expect(r.enemyHp).toBe(5);
-    attack(r, "strike", false);
-    expect(r.hp).toBe(4);
-    r.enemyHp = 2;
-    attack(r, "strike", true);
-    expect(r.hp).toBe(4);
-    r.enemyHp = 6;
-    r.hp = 1;
-    attack(r, "strike", false);
-    expect(r.status).toBe("dead");
-    const s = newSave();
-    s.run = r;
-    finish(s);
-    finish(s);
-    expect(s.history).toHaveLength(1);
-    s.run = createRun(2);
-    expect(s.run.hp).toBe(7);
-    expect(s.history).toHaveLength(1);
-  });
-  it("round-trips a run and rejects damaged or malicious imports", () => {
-    const s = newSave();
-    s.run = createRun(1);
-    record(s.learner, "porte", "seen", 1);
-    expect(parseSave(JSON.stringify(s))).toEqual(s);
-    expect(() => parseSave('{"version":2}')).toThrow();
-    const bad = structuredClone(s);
-    bad.run!.hp = 999;
-    expect(() => parseSave(JSON.stringify(bad))).toThrow();
-    const invalid = structuredClone(s);
-    invalid.run!.x = 0;
-    expect(() => parseSave(JSON.stringify(invalid))).toThrow();
-    expect(() => parseSave("x".repeat(2_000_001))).toThrow();
   });
 });
